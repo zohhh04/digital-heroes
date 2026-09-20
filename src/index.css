@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark; }
+html[data-theme="light"] { color-scheme: light; }
+body { @apply bg-ink text-slate-100 font-display antialiased; }
+.card { @apply bg-panel/80 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur; }
+.btn { @apply inline-flex items-center justify-center gap-2 rounded-xl font-semibold px-4 py-2.5 transition active:scale-[.98] disabled:opacity-50; }
+.btn-primary { @apply btn bg-accent text-white hover:bg-[#6a4ef5]; }
+.btn-ghost { @apply btn border border-white/15 hover:bg-white/5; }
+.btn-mint { @apply btn bg-mint text-ink hover:brightness-110; }
+.input { @apply w-full rounded-xl bg-ink border border-white/15 px-3.5 py-2.5 outline-none focus:border-accent placeholder:text-slate-500; }
+select.input option { background: #121A33; color: #f1f5f9; }
+.label { @apply text-xs uppercase tracking-widest text-slate-400 mb-1.5 block; }
+.badge { @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold; }
+.table { @apply w-full text-sm; }
+.table th { @apply text-left text-slate-400 font-medium px-3 py-2 border-b border-white/10; }
+.table td { @apply px-3 py-2.5 border-b border-white/5; }
+.navlink { @apply px-3 py-2 rounded-lg text-sm text-slate-300 hover:text-white hover:bg-white/5; }
+.navlink-active { @apply text-white bg-white/10; }
+.fade-in { animation: fadeIn .5s ease both; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px);} to { opacity: 1; transform: none; } }
+
+/* ---------- Light theme (toggle in header) ---------- */
+html[data-theme="light"] body { background: #eef2f7; color: #0f172a; }
+html[data-theme="light"] .card { background: #ffffff; border-color: #e2e8f0; box-shadow: 0 8px 24px rgba(15,23,42,.07); }
+html[data-theme="light"] .input { background: #ffffff; border-color: #cbd5e1; color: #0f172a; }
+html[data-theme="light"] select.input option { background: #ffffff; color: #0f172a; }
+html[data-theme="light"] .label { color: #64748b; }
+html[data-theme="light"] .btn-ghost { border-color: #cbd5e1; color: #0f172a; }
+html[data-theme="light"] .btn-ghost:hover { background: #f1f5f9; }
+html[data-theme="light"] .navlink { color: #475569; }
+html[data-theme="light"] .navlink:hover { color: #0f172a; background: #f1f5f9; }
+html[data-theme="light"] .navlink-active { color: #0f172a; background: #e2e8f0; }
+html[data-theme="light"] .table th { color: #64748b; border-color: #e2e8f0; }
+html[data-theme="light"] .table td { border-color: #f1f5f9; }
+html[data-theme="light"] header { background: rgba(255,255,255,.88) !important; border-color: #e2e8f0 !important; }
+html[data-theme="light"] header a, html[data-theme="light"] header span { color: #0f172a; }
+html[data-theme="light"] footer { border-color: #e2e8f0 !important; }
+html[data-theme="light"] .text-white { color: #0f172a !important; }
+html[data-theme="light"] .text-slate-300 { color: #475569 !important; }
+html[data-theme="light"] .text-slate-400 { color: #64748b !important; }
+html[data-theme="light"] .text-slate-500 { color: #94a3b8 !important; }
+html[data-theme="light"] .border-white\/10 { border-color: #e2e8f0 !important; }
+html[data-theme="light"] .bg-white\/5 { background: #f8fafc !important; }
+html[data-theme="light"] .bg-ink { background: #f8fafc !important; }
