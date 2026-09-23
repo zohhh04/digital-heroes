@@ -14,10 +14,10 @@ export default function Subscriptions() {
             <td className="space-x-2 text-xs"><button className="underline" onClick={() => setStatus(s.id, 'cancelled')}>cancel</button><button className="underline text-rose" onClick={() => setStatus(s.id, 'lapsed')}>lapse</button></td></tr>;
         })}</tbody></table></div>
       <div className="card text-sm"><p className="font-bold mb-1">Payments</p>
-        <table className="table text-sm"><thead><tr><th>ID</th><th>User</th><th>Plan</th><th>Amount</th><th>Status</th><th>Card</th></tr></thead>
+        <table className="table text-sm"><thead><tr><th>ID</th><th>User</th><th>Plan</th><th>Amount</th><th>Method</th><th>Status</th><th>Detail</th></tr></thead>
         <tbody>{(db.payments || []).slice().reverse().map((p) => {
           const u = db.users.find((x) => x.id === p.userId);
-          return <tr key={p.id}><td className="font-mono text-xs">{p.id}</td><td>{u?.email}</td><td>{p.planId}</td><td>₹{p.amount}</td><td>{p.status}</td><td>{p.cardLast4 ? `•••• ${p.cardLast4}` : '—'}</td></tr>;
+          return <tr key={p.id}><td className="font-mono text-xs">{p.id}</td><td>{u?.email}</td><td>{p.planId}</td><td>₹{p.amount}</td><td>{p.method || '—'}</td><td>{p.status}</td><td>{p.cardLast4 ? `•••• ${p.cardLast4}` : (p.methodDetail || '—')}</td></tr>;
         })}</tbody></table></div>
     </div>
   );

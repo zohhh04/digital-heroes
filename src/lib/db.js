@@ -47,10 +47,11 @@ export function seedDb() {
     ],
     // Payment intents (Stripe-test equivalent). A subscription is ONLY created
     // by the webhook-equivalent after a payment reaches `succeeded`.
-    // Shape: { id, userId, planId, amount, currency, charityId, pct, status,
-    //   attempts, lastError, cardLast4, createdAt, updatedAt, providerEventId }
+    // Shape: { id, userId, planId, amount, currency, charityId, pct, method,
+    //   methodDetail, status, attempts, lastError, cardLast4, createdAt,
+    //   updatedAt, providerEventId }
     payments: [
-      { id: 'pay_hero1', userId: 'u_hero', planId: 'monthly', amount: 999, currency: 'INR', charityId: 'ch_hope', pct: 15, status: 'succeeded', attempts: 1, lastError: null, cardLast4: '4242', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), providerEventId: 'evt_hero1' },
+      { id: 'pay_hero1', userId: 'u_hero', planId: 'monthly', amount: 999, currency: 'INR', charityId: 'ch_hope', pct: 15, method: 'card', methodDetail: null, status: 'succeeded', attempts: 1, lastError: null, cardLast4: '4242', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), providerEventId: 'evt_hero1' },
     ],
     audit: [],
     settings: { prizeFundingPct: DEFAULT_PRIZE_FUNDING_PCT, rolloverJackpot: 0 },
@@ -67,6 +68,10 @@ export function loadDb() {
     }
     // Backfill payments collection + link legacy seed subscription to its payment.
     if (!Array.isArray(db.payments)) db.payments = [];
+    for (const p of db.payments) {
+      if (!p.method) p.method = p.cardLast4 ? 'card' : 'upi';
+      if (p.methodDetail === undefined) p.methodDetail = null;
+    }
     if (!Array.isArray(db.subscriptions)) db.subscriptions = [];
     for (const s of db.subscriptions) {
       if (!s.paymentId) {

@@ -25,11 +25,30 @@ export const PAYMENT_STATUS = [
   'canceled',
 ];
 
+// Step 2 in the required chain: user picks HOW to pay before completing it.
+export const PAYMENT_METHODS = [
+  { id: 'upi', name: 'UPI', hint: 'GPay / PhonePe / Paytm' },
+  { id: 'card', name: 'Card', hint: 'Credit / debit' },
+  { id: 'netbanking', name: 'Net Banking', hint: 'All Indian banks' },
+];
+
 // Stripe-style test cards for the demo gateway.
 export const TEST_CARDS = [
   { number: '4242 4242 4242 4242', label: 'Succeeds', outcome: 'succeeded' },
   { number: '4000 0000 0000 0002', label: 'Declined (card_declined)', outcome: 'failed' },
   { number: '4000 0000 0000 9995', label: 'Fails (insufficient_funds)', outcome: 'failed' },
+];
+
+// Test UPI IDs for the demo gateway. Any other well-formed ID succeeds.
+export const TEST_UPI_IDS = [
+  { id: 'success@okhdfc', label: 'Succeeds' },
+  { id: 'fail@okhdfc', label: 'Fails (collect request declined)' },
+];
+
+export const TEST_BANKS = [
+  { id: 'HDFC', label: 'HDFC Bank — succeeds' },
+  { id: 'SBI', label: 'SBI — succeeds' },
+  { id: 'FAIL_BANK', label: 'Test Fail Bank — declines' },
 ];
 
 export function digitsOnly(s) {
@@ -84,6 +103,26 @@ export function validateCardForm({ name, number, expiry, cvc }) {
   return validateCardNumber(number) || validateExpiry(expiry) || validateCvc(cvc);
 }
 
+export function validateUpiId(v) {
+  const s = String(v || '').trim();
+  if (!s) return 'UPI ID is required (e.g. name@okhdfc).';
+  if (!/^[\w.\-]{2,256}@[a-zA-Z]{2,64}$/.test(s)) return 'Enter a valid UPI ID (e.g. name@okhdfc).';
+  return null;
+}
+
+export function validateBank(bank) {
+  if (!bank) return 'Please select your bank.';
+  if (!TEST_BANKS.some((b) => b.id === bank)) return 'Please select a valid bank.';
+  return null;
+}
+
+// Dispatch validation for the chosen payment method.
+export function validatePaymentForm(method, details) {
+  if (method === 'upi') return validateUpiId(details?.upiId);
+  if (method === 'netbanking') return validateBank(details?.bank);
+  return validateCardForm(details?.card || {});
+}
+
 export function formatCardNumber(v) {
   return digitsOnly(v).slice(0, 19).replace(/(\d{4})(?=\d)/g, '$1 ');
 }
@@ -98,10 +137,23 @@ export function last4(number) {
   return digitsOnly(number).slice(-4);
 }
 
-// Simulated provider decision, Stripe-test semantics:
-// known decline cards fail with a gateway reason; any other Luhn-valid
-// card succeeds. Luhn-invalid input never reaches here (client validation).
-export function resolveGatewayOutcome(cardNumber) {
+// Simulated provider decision. Input is method-specific; Luhn-invalid cards
+// and malformed UPI IDs never reach here (client validation runs first).
+// Test triggers: decline cards, fail@ UPI, FAIL_BANK — everything else succeeds.
+export function resolveGatewayOutcome({ method, cardNumber, upiId, bank }) {
+  if (method === 'upi') {
+    const s = String(upiId || '').trim().toLowerCase();
+    if (s.startsWith('fail@') || s.includes('fail') || s.includes('declined')) {
+      return { ok: false, code: 'upi_declined', message: 'UPI collect request was declined. Try success@okhdfc.' };
+    }
+    return { ok: true, code: 'succeeded', message: 'UPI payment succeeded.' };
+  }
+  if (method === 'netbanking') {
+    if (bank === 'FAIL_BANK') {
+      return { ok: false, code: 'bank_declined', message: 'Bank declined the payment. Try HDFC or SBI.' };
+    }
+    return { ok: true, code: 'succeeded', message: 'Net banking payment succeeded.' };
+  }
   const d = digitsOnly(cardNumber);
   if (d === '4000000000000002') {
     return { ok: false, code: 'card_declined', message: 'Your card was declined. Try the 4242 test card.' };
@@ -115,8 +167,16 @@ export function resolveGatewayOutcome(cardNumber) {
   return { ok: true, code: 'succeeded', message: 'Payment succeeded.' };
 }
 
+// Human-readable method reference for receipts (no sensitive data stored).
+export function methodDisplay(payment) {
+  if (!payment) return '';
+  if (payment.method === 'upi') return `UPI ${payment.methodDetail || ''}`;
+  if (payment.method === 'netbanking') return `Net Banking (${payment.methodDetail || ''})`;
+  return payment.cardLast4 ? `card •••• ${payment.cardLast4}` : 'card';
+}
+
 // Step 1 — create a pending intent. NEVER creates a subscription.
-export function newPaymentIntent({ userId, planId, amount, currency = 'INR', charityId, pct, id }) {
+export function newPaymentIntent({ userId, planId, amount, currency = 'INR', charityId, pct, id, method = 'upi' }) {
   const now = new Date().toISOString();
   return {
     id,
@@ -126,6 +186,8 @@ export function newPaymentIntent({ userId, planId, amount, currency = 'INR', cha
     currency,
     charityId,
     pct: Number(pct),
+    method,
+    methodDetail: null,
     status: 'requires_payment_method',
     attempts: 0,
     lastError: null,
