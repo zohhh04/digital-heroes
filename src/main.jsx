@@ -18,6 +18,7 @@ import Winnings from './pages/Winnings.jsx';
 import ProofUpload from './pages/ProofUpload.jsx';
 import CharityPref from './pages/CharityPref.jsx';
 import SubscriptionPage from './pages/SubscriptionPage.jsx';
+import Pricing from './pages/Pricing.jsx';
 import Settings from './pages/Settings.jsx';
 import AdminOverview from './pages/admin/Overview.jsx';
 import Users from './pages/admin/Users.jsx';
@@ -38,7 +39,7 @@ createRoot(document.getElementById('root')).render(
             <Route path="/how-it-works" element={<HowItWorks />} />
             <Route path="/charities" element={<Charities />} />
             <Route path="/charities/:id" element={<CharityDetail />} />
-            <Route path="/pricing" element={<Navigate to="/signup" />} />
+            <Route path="/pricing" element={<Pricing />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/login" element={<Login />} />
             <Route path="/dashboard" element={<RequireAuth><DashOutlet /></RequireAuth>}>

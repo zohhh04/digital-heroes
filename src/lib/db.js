@@ -29,7 +29,7 @@ export function seedDb() {
       { id: 'u_hero', name: 'Ravi Hero', email: 'hero@digitalheroes.test', pass: 'Hero@123', role: 'subscriber', planId: 'monthly', charityId: 'ch_hope', contribPct: 15, createdAt: new Date().toISOString() },
     ],
     subscriptions: [
-      { id: 'sub_hero1', userId: 'u_hero', planId: 'monthly', status: 'active', amount: 999, renewsAt: todayPlus(30), createdAt: new Date().toISOString(), provider: 'stripe_test_mock' },
+      { id: 'sub_hero1', userId: 'u_hero', planId: 'monthly', status: 'active', amount: 999, renewsAt: todayPlus(30), createdAt: new Date().toISOString(), provider: 'stripe_test_mock:webhook', paymentId: 'pay_hero1' },
     ],
     scores: [
       { id: uid('sc'), userId: 'u_hero', score_date: '2026-09-18', stableford: 36 },
@@ -45,6 +45,13 @@ export function seedDb() {
     contributions: [ // derived charity ledger
       { id: uid('cc'), userId: 'u_hero', charityId: 'ch_hope', amount: 150, pct: 15, source: 'subscription sub_hero1', at: new Date().toISOString() },
     ],
+    // Payment intents (Stripe-test equivalent). A subscription is ONLY created
+    // by the webhook-equivalent after a payment reaches `succeeded`.
+    // Shape: { id, userId, planId, amount, currency, charityId, pct, status,
+    //   attempts, lastError, cardLast4, createdAt, updatedAt, providerEventId }
+    payments: [
+      { id: 'pay_hero1', userId: 'u_hero', planId: 'monthly', amount: 999, currency: 'INR', charityId: 'ch_hope', pct: 15, status: 'succeeded', attempts: 1, lastError: null, cardLast4: '4242', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), providerEventId: 'evt_hero1' },
+    ],
     audit: [],
     settings: { prizeFundingPct: DEFAULT_PRIZE_FUNDING_PCT, rolloverJackpot: 0 },
     sessionUserId: null,
@@ -57,6 +64,15 @@ export function loadDb() {
     if (db.charities) {
       db.charities = db.charities.map((c) => (c.id === 'ch_edu' && c.image.includes('1523050854058')
         ? { ...c, image: 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=800&q=80' } : c));
+    }
+    // Backfill payments collection + link legacy seed subscription to its payment.
+    if (!Array.isArray(db.payments)) db.payments = [];
+    if (!Array.isArray(db.subscriptions)) db.subscriptions = [];
+    for (const s of db.subscriptions) {
+      if (!s.paymentId) {
+        const match = db.payments.find((p) => p.userId === s.userId && p.planId === s.planId && p.status === 'succeeded');
+        if (match) { s.paymentId = match.id; s.provider = s.provider || 'stripe_test_mock:webhook'; }
+      }
     }
     return db;
   };

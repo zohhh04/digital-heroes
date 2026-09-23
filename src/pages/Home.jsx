@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { PLANS } from '../lib/constants.js';
 
 export default function Home() {
-  const { db } = useAuth();
+  const { user, db } = useAuth();
   const featured = db.charities.filter((c) => c.featured && c.active);
   const totalRaised = db.contributions.reduce((a, c) => a + c.amount, 0) + db.charities.reduce((a, c) => a + (c.raised || 0), 0);
   const members = db.users.filter((u) => u.role === 'subscriber').length;
@@ -16,7 +16,7 @@ export default function Home() {
         <h1 className="text-4xl sm:text-5xl font-extrabold leading-tight">Play with purpose.<br />Give every round. <span className="text-gold">Win monthly.</span></h1>
         <p className="text-slate-300 mt-4 max-w-2xl">Record Stableford scores, enter monthly 5-number draws, and send at least 10% of your subscription to a charity you choose. No fairways-and-plaid clichés — just impact, motion, and modern play.</p>
         <div className="flex flex-wrap gap-3 mt-6">
-          <Link className="btn-primary" to="/signup">Join Digital Heroes</Link>
+          <Link className="btn-primary" to={user ? '/dashboard/subscription' : '/signup'}>{user ? 'Go to Subscription & pay' : 'Join Digital Heroes'}</Link>
           <Link className="btn-ghost" to="/charities">Explore charities</Link>
         </div>
       </section>
@@ -62,7 +62,8 @@ export default function Home() {
             <div key={p.id} className="card"><p className="font-bold">{p.name}</p>
               <p className="text-3xl font-extrabold mt-1">₹{p.price.toLocaleString('en-IN')}<span className="text-sm font-normal text-slate-400"> /{p.interval}</span></p>
               <p className="text-sm text-slate-400 mt-1">{p.blurb}</p>
-              <Link to="/signup" className="btn-primary mt-4">Choose {p.interval}</Link></div>
+              <p className="text-xs text-slate-500 mt-1">Secure checkout — subscription activates only after successful payment.</p>
+              <Link to={user ? '/dashboard/subscription' : '/signup'} className="btn-primary mt-4">Choose {p.interval}</Link></div>
           ))}
         </div>
       </section>
