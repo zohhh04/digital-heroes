@@ -15,7 +15,7 @@ export default function Signup() {
     if (f.password.length < 6) return setErr('Password must be at least 6 characters.');
     const r = signup({ name: f.name.trim(), email: f.email.trim(), password: f.password });
     if (!r.ok) return setErr('DUPLICATE');
-    nav('/login?registered=1');
+    nav('/dashboard/subscription');
   }
 
   if (user) {
@@ -44,7 +44,7 @@ export default function Signup() {
         <div><label className="label">Email</label><input className="input" type="email" value={f.email} onChange={(e) => set('email', e.target.value)} placeholder="you@example.com" /></div>
         <div><label className="label">Password</label><input className="input" type="password" value={f.password} onChange={(e) => set('password', e.target.value)} placeholder="Min 6 characters" /></div>
         <button className="btn-primary w-full">Register</button>
-        <p className="text-xs text-slate-500 text-center">After registering, login — then choose your plan + charity on the Subscription page.</p>
+        <p className="text-xs text-slate-500 text-center">After registering you go straight to Subscription — pick a plan, pay (test gateway), then enter golf scores for draws.</p>
       </form>
       <p className="text-sm text-slate-400">Have an account? <Link className="underline" to="/login">Login</Link></p>
     </div>

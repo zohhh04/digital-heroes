@@ -128,6 +128,41 @@ export function evaluateDraw({ winningNumbers, entries }) {
   return grouped;
 }
 
+// ---------- Score-direct winner selection ----------
+// The subscriber's saved rolling-5 golf scores ARE the entry.
+// Higher Stableford is better. Ranking: total desc, then best desc.
+export function scoreMetrics(retainedScores) {
+  const vals = (retainedScores || []).map((s) => Number(s.stableford)).filter((n) => Number.isFinite(n));
+  const total = vals.reduce((a, b) => a + b, 0);
+  const best = vals.length ? Math.max(...vals) : 0;
+  const avg = vals.length ? total / vals.length : 0;
+  return { total, best, avg, count: vals.length };
+}
+
+// participants: [{ userId, scores: [{score_date, stableford}] }]
+// Tier mapping (maps to existing 40/35/25 pool split):
+//   distinct total level 0 (highest) -> tier 5 (gold)
+//   distinct total level 1           -> tier 4 (silver)
+//   distinct total level 2           -> tier 3 (bronze)
+// Ties on total share the same tier (splitTier divides equally).
+// No scores => cannot win (tier 0).
+export function rankScoreEntries(participants) {
+  const withTotals = (participants || [])
+    .map((p) => ({ ...p, ...scoreMetrics(p.scores) }))
+    .filter((p) => p.count > 0)
+    .sort((a, b) => b.total - a.total || b.best - a.best || b.count - a.count);
+  const levels = [...new Set(withTotals.map((p) => p.total))];
+  const grouped = { 5: [], 4: [], 3: [] };
+  const ranked = withTotals.map((p) => {
+    const level = levels.indexOf(p.total);
+    const tier = level === 0 ? 5 : level === 1 ? 4 : level === 2 ? 3 : 0;
+    const row = { ...p, tier, matches: p.total };
+    if (tier) grouped[tier].push(row);
+    return row;
+  });
+  return { grouped, ranked, levels };
+}
+
 // ---------- Charity (PRD §7) ----------
 export function validateContributionPct(p) {
   const n = Number(p);

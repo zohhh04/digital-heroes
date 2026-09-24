@@ -1,14 +1,85 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { loadDb, saveDb, resetDb } from '../lib/db.js';
+import { cloudEnabled, cloudClient, cloudLoad, cloudPushDebounced, cloudSubscribe, mergeDb } from '../lib/cloud.js';
 
 const Ctx = createContext(null);
 
 export function AuthProvider({ children }) {
   const [db, setDb] = useState(() => loadDb());
+  const [cloudStatus, setCloudStatus] = useState(cloudEnabled ? 'connecting' : 'local');
+  const dbRef = useRef(db);
+  dbRef.current = db;
+
+  // Local persist (always) + cloud push (when configured).
   useEffect(() => { saveDb(db); }, [db]);
+  useEffect(() => {
+    if (cloudEnabled) cloudPushDebounced(() => dbRef.current);
+  }, [db]);
+
+  // Cross-tab sync (same browser).
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key === 'dh_db_v1' && e.newValue) {
+        try {
+          const incoming = JSON.parse(e.newValue);
+          setDb((cur) => mergeDb({ ...cur, sessionUserId: cur.sessionUserId }, { ...incoming, sessionUserId: cur.sessionUserId }));
+        } catch { /* ignore */ }
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  // Cross-device sync (Supabase shared blob).
+  useEffect(() => {
+    if (!cloudEnabled) return;
+    let alive = true;
+    (async () => {
+      try {
+        const remote = await cloudLoad();
+        if (alive && remote) {
+          setDb((cur) => ({ ...mergeDb(cur, remote), sessionUserId: cur.sessionUserId || remote.sessionUserId || null }));
+          setCloudStatus('shared');
+        } else if (alive) {
+          // First device: push local seed so other devices can see it.
+          const sb = cloudClient();
+          if (sb) {
+            const local = dbRef.current;
+            const { sessionUserId, ...shared } = local;
+            await sb.from('app_db').upsert({ id: 1, data: shared, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+          }
+          setCloudStatus('shared');
+        }
+      } catch { if (alive) setCloudStatus('local-error'); }
+    })();
+    const off = cloudSubscribe((remote) => {
+      setDb((cur) => ({ ...mergeDb(cur, remote), sessionUserId: cur.sessionUserId }));
+    });
+    // Poll fallback (realtime may be disabled on free tier).
+    const poll = setInterval(async () => {
+      try {
+        const remote = await cloudLoad();
+        if (remote && alive) setDb((cur) => {
+          const merged = mergeDb(cur, remote);
+          return JSON.stringify(merged.users?.length) !== JSON.stringify(cur.users?.length) || JSON.stringify(merged.scores?.length) !== JSON.stringify(cur.scores?.length)
+            ? { ...merged, sessionUserId: cur.sessionUserId }
+            : cur;
+        });
+      } catch { /* offline */ }
+    }, 7000);
+    const onFocus = async () => {
+      try {
+        const remote = await cloudLoad();
+        if (remote) setDb((cur) => ({ ...mergeDb(cur, remote), sessionUserId: cur.sessionUserId }));
+      } catch { /* ignore */ }
+    };
+    window.addEventListener('focus', onFocus);
+    return () => { alive = false; off(); clearInterval(poll); window.removeEventListener('focus', onFocus); };
+  }, []);
+
   const sessionUser = useMemo(() => db.users.find((u) => u.id === db.sessionUserId) || null, [db]);
   const api = useMemo(() => ({
-    db, setDb,
+    db, setDb, cloudStatus, cloudEnabled,
     user: sessionUser,
     isAdmin: sessionUser?.role === 'admin',
     // Backend must validate subscription status on authenticated requests (PRD §3).
@@ -23,23 +94,46 @@ export function AuthProvider({ children }) {
       return sub;
     },
     signup({ name, email, password, planId = null, charityId = null, contribPct = 10 }) {
-      if (db.users.some((u) => u.email.toLowerCase() === email.toLowerCase())) return { ok: false, error: 'DUPLICATE' };
+      const cleanEmail = String(email || '').trim();
+      const cleanPass = String(password || '');
+      if (db.users.some((u) => u.email.toLowerCase() === cleanEmail.toLowerCase())) return { ok: false, error: 'DUPLICATE' };
       const id = 'u_' + Math.random().toString(36).slice(2, 9);
-      const user = { id, name, email, pass: password, role: 'subscriber', planId, charityId: charityId || db.charities[0]?.id || null, contribPct: Number(contribPct) || 10, createdAt: new Date().toISOString() };
-      // Register-only: no subscription created here. User picks plan + charity
-      // on the Subscription page after login. Intentionally NOT logging in.
-      setDb((d) => ({ ...d, users: [...d.users, user] }));
+      const user = { id, name, email: cleanEmail, pass: cleanPass, role: 'subscriber', planId, charityId: charityId || db.charities[0]?.id || null, contribPct: Number(contribPct) || 10, createdAt: new Date().toISOString() };
+      // Register + auto-login so the new email works immediately on any device.
+      // No subscription yet — user picks plan + pays on Subscription page.
+      setDb((d) => {
+        if (d.users.some((u) => u.email.toLowerCase() === cleanEmail.toLowerCase())) return d;
+        return { ...d, users: [...d.users, user], sessionUserId: id };
+      });
       return { ok: true, userId: id };
     },
     login(email, password) {
-      const u = db.users.find((x) => x.email.toLowerCase() === email.toLowerCase() && x.pass === password);
-      if (!u) return { ok: false, error: 'Invalid credentials. Try the demo logins on the Login page.' };
+      const cleanEmail = String(email || '').trim().toLowerCase();
+      const u = db.users.find((x) => x.email.toLowerCase() === cleanEmail && x.pass === String(password || ''));
+      if (!u) {
+        // Fallback: also try trimmed password (catches accidental trailing spaces).
+        const u2 = db.users.find((x) => x.email.toLowerCase() === cleanEmail && x.pass.trim() === String(password || '').trim());
+        if (!u2) return { ok: false, error: 'Invalid credentials. Try the demo logins on the Login page.' };
+        setDb((d) => ({ ...d, sessionUserId: u2.id }));
+        return { ok: true, user: u2 };
+      }
       setDb((d) => ({ ...d, sessionUserId: u.id }));
       return { ok: true, user: u };
     },
     logout() { setDb((d) => ({ ...d, sessionUserId: null })); },
-    resetAll() { setDb(resetDb()); },
-  }), [db, sessionUser]);
+    resetAll() {
+      const s = resetDb();
+      setDb({ ...s, sessionUserId: null });
+      if (cloudEnabled) {
+        const sb = cloudClient();
+        if (sb) {
+          const { sessionUserId, ...shared } = s;
+          sb.from('app_db').upsert({ id: 1, data: shared, updated_at: new Date().toISOString() }, { onConflict: 'id' }).then(() => {});
+        }
+      }
+      return s;
+    },
+  }), [db, sessionUser, cloudStatus]);
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
 }
 export function useAuth() { return useContext(Ctx); }

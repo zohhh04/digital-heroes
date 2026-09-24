@@ -24,6 +24,7 @@ export function seedCharities() {
 export function seedDb() {
   return {
     version: 1,
+    _deleted: { users: [], subscriptions: [], scores: [], entries: [], winners: [] },
     users: [
       { id: 'u_admin', name: 'Ava Admin', email: 'admin@digitalheroes.test', pass: 'Admin@123', role: 'admin', planId: null, charityId: 'ch_hope', contribPct: 10, createdAt: new Date().toISOString() },
       { id: 'u_hero', name: 'Ravi Hero', email: 'hero@digitalheroes.test', pass: 'Hero@123', role: 'subscriber', planId: 'monthly', charityId: 'ch_hope', contribPct: 15, createdAt: new Date().toISOString() },
@@ -61,6 +62,24 @@ export function seedDb() {
 
 export function loadDb() {
   const migrate = (db) => {
+    // Self-heal: every collection must exist so no registered user/score is hidden by a bad save.
+    const arr = (v) => (Array.isArray(v) ? v : []);
+    db.users = arr(db.users);
+    db.subscriptions = arr(db.subscriptions);
+    db.scores = arr(db.scores);
+    db.charities = arr(db.charities).length ? db.charities : seedCharities();
+    db.draws = arr(db.draws);
+    db.entries = arr(db.entries);
+    db.pools = arr(db.pools);
+    db.winners = arr(db.winners);
+    db.donations = arr(db.donations);
+    db.contributions = arr(db.contributions);
+    db.payments = arr(db.payments);
+    db.audit = arr(db.audit);
+    db.settings = db.settings || { prizeFundingPct: DEFAULT_PRIZE_FUNDING_PCT, rolloverJackpot: 0 };
+    if (!db._deleted || typeof db._deleted !== 'object') db._deleted = { users: [], subscriptions: [], scores: [], entries: [], winners: [] };
+    // Drop corrupt user rows (no id/email) but NEVER drop valid registrations.
+    db.users = db.users.filter((u) => u && u.id && u.email);
     // Fix old broken Scholarship Birdies photo for existing saved data.
     if (db.charities) {
       db.charities = db.charities.map((c) => (c.id === 'ch_edu' && c.image.includes('1523050854058')

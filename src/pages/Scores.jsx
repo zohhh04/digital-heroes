@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { rollScores } from '../lib/engine.js';
 import { uid } from '../lib/db.js';
@@ -14,7 +15,8 @@ export default function Scores() {
 
   function submit(e) {
     e.preventDefault(); setErr('');
-    if (!sub) return setErr('Active subscription required to enter scores.');
+    // Scores are ALWAYS saved (per requirement). Draw eligibility still needs
+    // an active subscription — enforced in draw management, not here.
     const existing = mine.map((s) => ({ score_date: s.score_date, stableford: s.stableford }));
     if (editing) {
       const others = existing.filter((s) => s.score_date !== editing.score_date);
@@ -38,12 +40,13 @@ export default function Scores() {
       return { ...d, scores: [...others, ...merged] };
     });
   }
-  function del(id) { setDb((d) => ({ ...d, scores: d.scores.filter((s) => s.id !== id) })); }
+  function del(id) { setDb((d) => ({ ...d, scores: d.scores.filter((s) => s.id !== id), _deleted: { ...(d._deleted || {}), scores: [...((d._deleted || {}).scores || []), id] } })); }
   function startEdit(row) { setEditing(row); setScore(row.stableford); setDate(row.score_date); }
 
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-extrabold">Golf scores <span className="text-sm font-normal text-slate-400">(rolling 5, newest first)</span></h1>
+      {!sub && <div className="card border-gold/40 text-sm">Scores are saved, but you need an <b>active subscription</b> for them to count in draws. <Link className="underline" to="/dashboard/subscription">Subscribe now →</Link></div>}
       <form onSubmit={submit} className="card space-y-3">
         {err && <p className="text-sm text-rose bg-rose/10 border border-rose/30 rounded-xl px-3 py-2">{err}</p>}
         <div className="grid grid-cols-2 gap-3">

@@ -38,7 +38,7 @@ create table if not exists scores (
   unique (user_id, score_date)  -- PRD §4: one score per date, enforced in DB
 );
 create table if not exists draws (
-  id uuid primary key default gen_random_uuid(), label text not null, mode text not null check (mode in ('random','algorithmic')),
+  id uuid primary key default gen_random_uuid(), label text not null, mode text not null check (mode in ('random','algorithmic','scores')),
   status text not null default 'draft' check (status in ('draft','simulated','drawn','published','closed')),
   winning int[] null, algo_config jsonb default '{}', funding_pct numeric default 50,
   created_at timestamptz default now()
@@ -87,6 +87,28 @@ create table if not exists platform_settings (
 );
 insert into platform_settings(key,value) values ('prize_funding_pct','50'),('rollover_jackpot','0')
 on conflict (key) do nothing;
+
+-- Shared demo DB (cross-device): single JSON blob all devices read/write.
+-- This is what makes a subscriber who registers/logs in on phone B
+-- appear in admin on laptop A, with scores + draw evaluation.
+-- Run this in Supabase SQL editor, then set VITE_SUPABASE_URL +
+-- VITE_SUPABASE_ANON_KEY in Vercel/local .env and redeploy.
+create table if not exists app_db (
+  id int primary key,
+  data jsonb not null,
+  updated_at timestamptz default now()
+);
+insert into app_db(id, data, updated_at) values (1, '{}', now())
+on conflict (id) do nothing;
+alter table app_db enable row level security;
+drop policy if exists "demo open read" on app_db;
+drop policy if exists "demo open write" on app_db;
+create policy "demo open read" on app_db for select using (true);
+create policy "demo open write" on app_db for insert with check (true);
+create policy "demo open write" on app_db for update using (true);
+-- NOTE: open policies are for this demo only. For production use
+-- per-user RLS on the normalized tables above (profiles/scores/...) +
+-- Supabase Auth, never a shared blob.
 
 -- RLS: enable on exposed tables; policies enforce owner-or-admin.
 alter table profiles enable row level security;

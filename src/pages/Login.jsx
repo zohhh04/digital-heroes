@@ -21,7 +21,7 @@ export default function Login() {
   return (
     <div className="max-w-md mx-auto card space-y-4">
       <h1 className="text-2xl font-extrabold">Login</h1>
-      {justRegistered && <p className="text-sm bg-mint/10 border border-mint/40 rounded-xl px-3 py-2">🎉 Account + subscription created! Now <b>login below</b> to enter the website.</p>}
+      {justRegistered && <p className="text-sm bg-mint/10 border border-mint/40 rounded-xl px-3 py-2">🎉 Account created! Now <b>login below</b> to enter the website.</p>}
       {err && <p className="text-sm text-rose bg-rose/10 border border-rose/30 rounded-xl px-3 py-2">{err}</p>}
       <form onSubmit={submit} className="space-y-3">
         <div><label className="label">Email</label><input className="input" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
